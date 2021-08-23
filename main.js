@@ -48,8 +48,10 @@ var CALC = {
     }
 };
 var APP = {
+    version: "0.2.1",
     TABLE: {
         draw() {
+            console.log(`%cBOMFormMock v${APP.version}`, 'color: green');
             this.writeHeaders();
             this.writeComponents();
         },
@@ -70,7 +72,7 @@ var APP = {
                 html += `<td><input type="radio" name="reference" id="Ref_Component${comp}" value = "Ref_Component${comp}"></td>`;
                 //inputs
                 for (let inp of inputs) {
-                    html += `<td><input class="response" type="text" id = "Component${comp}_${inp}"></td>`;
+                    html += `<td><input class="response Component${comp} ${inp}" type="text" id = "Component${comp}_${inp}"></td>`;
                 }
                 //properties
                 for (let prop of properties) {
@@ -84,8 +86,8 @@ var APP = {
             }
             //sum
             let html = `<tr class="table-dark"><td colspan="2">Sum</td>`;
-            for (let [index, inp] of inputs.entries()) {
-                html += `<td id = "S${index}"></td>`;
+            for (let inp of inputs) {
+                html += `<td id = "S_${inp}"></td>`;
             }
             html += `<td colspan=${properties.length}></td></tr>`;
             $("#table > tbody").append(html);
@@ -99,7 +101,7 @@ var APP = {
                 html += `<td><input type="radio" name="reference" id="Ref_Product${comp}" value = "Ref_Product${comp}"></td>`;
                 //inputs
                 for (let inp of inputs) {
-                    html += `<td><input class="response" type="text" id = "Product${comp}_${inp}"></td>`;
+                    html += `<td><input class="response Product${comp} ${inp}" type="text" id = "Product${comp}_${inp}"></td>`;
                 }
                 //properties
                 for (let prop of properties) {
@@ -118,6 +120,7 @@ var APP = {
         }
     },
     handle() {
+        console.clear();
         //let value = parseFloat(this.value);
         let id = this.id;
         let row = id.substring(0, id.indexOf("_"));
@@ -127,17 +130,47 @@ var APP = {
         let R = $('input[name=reference]:checked').val();
         R = R.substring(R.indexOf("_") + 1);
         console.log(".R", R);
-        let allResponses = $(".response");
+        //let allResponses = $(".response");
+        let rowResponses = $(`.${row}`);
 
-        for (let response of allResponses) {
+        // calc all in the row
+        for (let response of rowResponses) {
             if (response.id === id) continue; //this was entered
-            if (!response.id.startsWith(`${row}_`)) continue;
+            // if (!response.id.startsWith(`${row}_`)) continue;
             console.log("..", response.id);
             let responseColumn = response.id.substring(id.indexOf("_") + 1);
             let ARG = APP.packArguments(row, R, referenceBy);
             console.log("....Column: ", responseColumn, " #### ");
             $(`#${response.id}`).val(CALC[responseColumn](ARG));
         }
+        //calc scale factor and scale the row
+        let oldFactor = parseFloat($(`#${row}_${referenceBy}`).val()) / parseFloat($(`#${R}_${referenceBy}`).val());
+        let scaleFactor = parseFloat($(`#${row}_factor`).val()) / oldFactor;
+        console.log("oldFactor", oldFactor, "scaleFactor", scaleFactor);
+        //scale the row
+        for (let inp of inputs){
+            if (inp === 'factor') continue; 
+            $(`#${row}_${inp}`).val($(`#${row}_${inp}`).val() * scaleFactor);
+        }
+        //if row is Reference, then all the table needs to be recalcd, except Reference row
+        console.log("\n");
+        if (row === R){
+            let allResponses = $(".response");
+            for (let response of allResponses){
+                if (response.id === id) continue; //this was entered
+                let rowIdentifier = response.id.substring(0, id.indexOf("_"));
+                if (rowIdentifier === R) continue; //skip Reference row
+                console.log("... recalc:", response.id);
+            }
+        }
+
+
+        //mass sum
+        let massSum = 0;
+        for (let component = 1; component <= Object.keys(COMPONENTS).length; component++) {
+            massSum += parseFloat($(`#Component${component}_mass`).val()) || 0;
+        }
+        $(`#S_mass`).html(massSum);
     },
     /*handle() {
         //let element = this;
