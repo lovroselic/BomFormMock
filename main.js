@@ -48,7 +48,10 @@ var CALC = {
     }
 };
 var APP = {
-    version: "0.2.1",
+    version: "0.2.2",
+    STACK: {
+        TARGET: null,
+    },
     TABLE: {
         draw() {
             console.log(`%cBOMFormMock v${APP.version}`, 'color: green');
@@ -126,7 +129,7 @@ var APP = {
         let row = id.substring(0, id.indexOf("_"));
         let column = id.substring(id.indexOf("_") + 1);
         let referenceBy = $('input[name=whichref]:checked').val();
-        console.log("HANDLE", id, row, column, "referenceBy", referenceBy);
+        console.log("HANDLE", "id", id, "row", row, "column", column, "referenceBy", referenceBy);
         let R = $('input[name=reference]:checked').val();
         R = R.substring(R.indexOf("_") + 1);
         console.log(".R", R);
@@ -148,22 +151,34 @@ var APP = {
         let scaleFactor = parseFloat($(`#${row}_factor`).val()) / oldFactor;
         console.log("oldFactor", oldFactor, "scaleFactor", scaleFactor);
         //scale the row
-        for (let inp of inputs){
-            if (inp === 'factor') continue; 
-            $(`#${row}_${inp}`).val($(`#${row}_${inp}`).val() * scaleFactor);
-        }
-        //if row is Reference, then all the table needs to be recalcd, except Reference row
-        console.log("\n");
-        if (row === R){
-            let allResponses = $(".response");
-            for (let response of allResponses){
-                if (response.id === id) continue; //this was entered
-                let rowIdentifier = response.id.substring(0, id.indexOf("_"));
-                if (rowIdentifier === R) continue; //skip Reference row
-                console.log("... recalc:", response.id);
+        if (!Number.isNaN(scaleFactor)) {
+            for (let inp of inputs) {
+                if (inp === 'factor') continue;
+                $(`#${row}_${inp}`).val($(`#${row}_${inp}`).val() * scaleFactor);
             }
         }
-
+        //if row is Reference, then all the table needs to be recalcd, except Reference row
+        console.log("\n", row, R, row === R);
+        
+        if (row === R) {
+            let allResponses = $(".response");
+            for (let response of allResponses) {
+                if (response.id === id) continue; //this was entered
+                let rowIdentifier = response.id.substring(0, response.id.indexOf("_"));
+                if (rowIdentifier === R) continue; //skip Reference row
+                let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
+                if (columnIdentifier === 'factor') continue; //factors are not scaled!
+                console.log("... recalc:", response.id);
+                let targetScaleFactor = parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
+                console.log('....targetScaleFactor', targetScaleFactor);
+                let value = parseFloat($(`#${response.id}`).val());
+                value *= targetScaleFactor;
+                if (Number.isNaN(value)) value = "";
+                console.log("....value", value, "id", rowIdentifier +"_"+ columnIdentifier);
+                $(`#${response.id}`).val(value);
+            }
+        }
+        
 
         //mass sum
         let massSum = 0;
@@ -171,6 +186,9 @@ var APP = {
             massSum += parseFloat($(`#Component${component}_mass`).val()) || 0;
         }
         $(`#S_mass`).html(massSum);
+        // store target for reference
+        APP.STACK.TARGET = parseFloat($(`#${R}_${referenceBy}`).val());
+        console.log('APP.STACK.TARGET', APP.STACK.TARGET);
     },
     /*handle() {
         //let element = this;
