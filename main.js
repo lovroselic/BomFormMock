@@ -10,7 +10,7 @@ console.clear();
 */
 /**
  * TODO:
- * if ref by mass, ignore mol
+ *  calc from factor
  */
 
 var descriptors = ['Component', 'Ref'];
@@ -53,7 +53,7 @@ var CALC = {
     }
 };
 var APP = {
-    version: "0.4.0",
+    version: "0.5.1",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -63,6 +63,7 @@ var APP = {
             console.log(`%cBOMFormMock v${APP.version}`, 'color: green');
             this.writeHeaders();
             this.writeComponents();
+            $("#v").html(`v${APP.version} by LS`);
         },
         writeHeaders() {
             let html = "";
@@ -144,6 +145,8 @@ var APP = {
         console.log("HANDLE", "id", id, "row", row, "column", column, "referenceBy", referenceBy);
         let R = APP.getReferenceRow();
         console.log(".R", R);
+        //if column == factor in refby = empty
+
         let rowResponses = $(`.${row}`);
 
         // calc all in the row
@@ -155,22 +158,30 @@ var APP = {
             console.log("....Column: ", responseColumn, " #### ");
             $(`#${response.id}`).val(CALC[responseColumn](ARG));
         }
+
         //calc scale factor and scale the row
         //let oldFactor = parseFloat($(`#${row}_${referenceBy}`).val()) / parseFloat($(`#${R}_${referenceBy}`).val());
         let oldFactor;
         if (row !== R) {
             oldFactor = parseFloat($(`#${row}_${referenceBy}`).val()) / parseFloat($(`#${R}_${referenceBy}`).val());
+            //oldFactor isNaN only if it has never been set, so:
+            if (Number.isNaN(oldFactor)) oldFactor = 1;
         } else {
             // can't calculate old reference factor from changed data;
             oldFactor = APP.STACK.REFERENCE_FACTOR;
         }
         let scaleFactor = parseFloat($(`#${row}_factor`).val()) / oldFactor;
-        console.log("oldFactor", oldFactor, "scaleFactor", scaleFactor);
+        console.log("\noldFactor", oldFactor, "scaleFactor", scaleFactor);
+
         //scale the row
         if (!Number.isNaN(scaleFactor)) {
             for (let inp of inputs) {
                 if (inp === 'factor') continue;
-                $(`#${row}_${inp}`).val(Number($(`#${row}_${inp}`).val() * scaleFactor).toFixed(2));
+                let cellValue = $(`#${row}_${inp}`).val();
+                if (cellValue !== ""){
+                    $(`#${row}_${inp}`).val(Number(cellValue * scaleFactor).toFixed(2));
+                }
+                
             }
         }
 
@@ -204,71 +215,20 @@ var APP = {
         for (let component = 1; component <= Object.keys(COMPONENTS).length; component++) {
             massSum += parseFloat($(`#Component${component}_mass`).val()) || 0;
         }
-        $(`#S_mass`).html(massSum.toFixed(2));
-        APP.storeReferences(R, referenceBy);
-    },
-    /*handle() {
-        //let element = this;
-        let value = parseFloat(this.value);
-        let id = this.id;
-        let row = id.substring(0, id.indexOf("Input"));
-        console.log("row", row);
-        let R = $('input[name=reference]:checked').val();
-        let referenceBy = $('input[name=whichref]:checked').val();
-        //console.log("handler", id, value, "R", R, referenceBy);
-        // all responses in a row to be processed
-        let responses = $(".response");
-        console.log("responses", responses);
-        var refIndex = inputs.indexOf(referenceBy);
-        for (let response of responses) { 
-            if (response.id === id) continue; //this was entered
-            let inputIdentifier = parseInt(response.id.substring(response.id.indexOf("Input") + "Input".length), 10);
-            let rowIdentifier = response.id.substring(0, response.id.indexOf("Input"));
-            if (rowIdentifier !== row) continue; //
-            let ref = `${R.substring(3)}Input${refIndex}`;
-            let selected = `${rowIdentifier}Input${refIndex}`;
-            let ratio = APP.getRatio(selected, ref);
-            console.log("response.id", response.id);
-            if (inputIdentifier === inputs.indexOf("ratio")) {
-                $(`#${response.id}`).val(ratio || "");
-
-            } else {
-                //if (referenceBy === "mass" && inputIdentifier === inputs.indexOf("mol")) continue; //
-                let ARG = APP.packArguments(rowIdentifier);
-                ARG.ratio = ratio;
-                let func = CALC[inputs[inputIdentifier]];
-                //console.log(".func", func);
-                //calc value
-                $(`#${response.id}`).val(func.call(null, ARG));
-                //
-                //break;
-            }
-
-        }
-        //mass sum
-        let massSum = 0;
-        for (let component = 1; component <= Object.keys(COMPONENTS).length; component++) {
-            massSum += parseFloat($(`#Component${component}Input${inputs.indexOf("mass")}`).val()) || 0;
-        }
-        $(`#S${inputs.indexOf("mass")}`).html(massSum);
-
+        massSum = massSum.toFixed(2);
+        $(`#S_mass`).html(massSum);
         //if reference by mass fill massSum as target value
         if (referenceBy === 'mass') {
-            //$("#Product1Input1").val(massSum); //direct, does not scale, refactor!!
-            $(`#Product1Input${inputs.indexOf("mass")}`).val(massSum);
+            $(`#Product1_mass`).val(massSum);
         }
-
-    },*/
-
+        APP.storeReferences(R, referenceBy);
+    },
     handleReferenceRowChange() {
         console.clear();
         let R = APP.getReferenceRow();
         let referenceBy = $('input[name=whichref]:checked').val();
         console.log(".R", R);
         APP.storeReferences(R, referenceBy);
-        //reference was changed so we need to change target
-        /*APP.STACK.TARGET = parseFloat($(`#${R}_${referenceBy}`).val());
-        console.log('APP.STACK.TARGET', APP.STACK.TARGET);*/
     },
     packArguments(row, R, referenceBy) {
         let arg = {};
