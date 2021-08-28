@@ -5,12 +5,12 @@ console.clear();
 
 /**
     simplifications:
-        assumed  units, no conversions
+        assumed  units
 
 */
 /**
  * TODO:
- *  calc from factor
+
  */
 
 var descriptors = ['Component', 'Ref'];
@@ -20,7 +20,7 @@ var headers = [...descriptors, ...inputs, ...properties];
 
 var CALC = {
     factor(arg) {
-        console.log(".....calc factor", arg);
+        if (arg.referenceBy === 'mass') return "";
         let value;
         if (arg.selectedFactor === arg.referenceFactor) {
             value = APP.STACK.REFERENCE_FACTOR;
@@ -31,29 +31,32 @@ var CALC = {
         return value.toFixed(2);
     },
     mass(arg) {
-        console.log(".....calc mass", arg);
-        let value = parseFloat(arg.mol * arg.MW);
+        let value = Number.parseFloat(arg.mol * arg.MW);
         if (Number.isNaN(value)) {
-            value = parseFloat(arg.volume * arg.density);
+            value = Number.parseFloat(arg.volume * arg.density);
         }
         if (Number.isNaN(value)) return "";
         return Number(value / arg.assay).toFixed(2);
     },
     volume(arg) {
-        console.log(".....calc volume", arg);
-        let value = parseFloat(arg.mass / arg.density);
+        let value = Number.parseFloat(arg.mass / arg.density);
         if (Number.isNaN(value)) return "";
         return value.toFixed(2);
     },
     mol(arg) {
-        console.log(".....calc mol", arg);
-        let value = parseFloat(arg.mass / arg.MW);
-        if (Number.isNaN(value)) return "";
+        if (arg.referenceBy === 'mass') return "";
+        let value = Number.parseFloat(Number.parseFloat(arg.mass) / arg.MW); //coercing "" to NaN
+        if (Number.isNaN(value)) {
+            if (arg.mol) {
+                //mol has been set from factor, but mass == "";
+                return arg.mol;
+            } else return "";
+        }
         return Number(value * arg.assay).toFixed(2);
     }
 };
 var APP = {
-    version: "0.5.1",
+    version: "0.7.0",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -123,11 +126,19 @@ var APP = {
                 //insert row
                 $("#table > tbody").append(html);
             }
-            // first checked by default
-            $("#Ref_Component1").prop("checked", true);
-            // first factor 1 by default
-            $("#Component1_factor").val(1);
+
+            APP.init();
+            //mol by default
+            $("#ref_mol").prop("checked", true);
         }
+    },
+    init() {
+        // first checked by default
+        $("#Ref_Component1").prop("checked", true);
+        // first factor 1 by default if mol, otherwise """
+        if ($('input[name=whichref]:checked').val() === 'mass') {
+            $("#Component1_factor").val("");
+        } else $("#Component1_factor").val(1);
     },
     getReferenceRow() {
         let R = $('input[name=reference]:checked').val();
@@ -135,58 +146,55 @@ var APP = {
         return R;
     },
     handle() {
-        console.clear();
         let id = this.id;
         let row = id.substring(0, id.indexOf("_"));
         let column = id.substring(id.indexOf("_") + 1);
         let referenceBy = $('input[name=whichref]:checked').val();
-        console.log('OLD APP.STACK.TARGET', APP.STACK.TARGET);
-        console.log('OLD APP.STACK.REFERENCE_FACTOR', APP.STACK.REFERENCE_FACTOR);
-        console.log("HANDLE", "id", id, "row", row, "column", column, "referenceBy", referenceBy);
         let R = APP.getReferenceRow();
-        console.log(".R", R);
-        //if column == factor in refby = empty
+
+        //if column == factor in refby has no value
+        if (column === 'factor' && $(`#${row}_${referenceBy}`).val() === "") {
+            if ($(`#${R}_${referenceBy}`).val() !== "") {
+                let refValue = $(`#${R}_${referenceBy}`).val() * $(`#${row}_factor`).val() / $(`#${R}_factor`).val();
+                $(`#${row}_${referenceBy}`).val(Number(refValue).toFixed(2));
+            }
+        }
 
         let rowResponses = $(`.${row}`);
 
         // calc all in the row
         for (let response of rowResponses) {
             if (response.id === id) continue; //this was entered
-            console.log("..", response.id);
             let responseColumn = response.id.substring(id.indexOf("_") + 1);
             let ARG = APP.packArguments(row, R, referenceBy);
-            console.log("....Column: ", responseColumn, " #### ");
             $(`#${response.id}`).val(CALC[responseColumn](ARG));
         }
 
         //calc scale factor and scale the row
-        //let oldFactor = parseFloat($(`#${row}_${referenceBy}`).val()) / parseFloat($(`#${R}_${referenceBy}`).val());
         let oldFactor;
         if (row !== R) {
-            oldFactor = parseFloat($(`#${row}_${referenceBy}`).val()) / parseFloat($(`#${R}_${referenceBy}`).val());
+            oldFactor = Number.parseFloat($(`#${row}_${referenceBy}`).val()) / Number.parseFloat($(`#${R}_${referenceBy}`).val());
             //oldFactor isNaN only if it has never been set, so:
             if (Number.isNaN(oldFactor)) oldFactor = 1;
         } else {
             // can't calculate old reference factor from changed data;
             oldFactor = APP.STACK.REFERENCE_FACTOR;
         }
-        let scaleFactor = parseFloat($(`#${row}_factor`).val()) / oldFactor;
-        console.log("\noldFactor", oldFactor, "scaleFactor", scaleFactor);
+        let scaleFactor = Number.parseFloat($(`#${row}_factor`).val()) / oldFactor;
 
         //scale the row
         if (!Number.isNaN(scaleFactor)) {
             for (let inp of inputs) {
                 if (inp === 'factor') continue;
                 let cellValue = $(`#${row}_${inp}`).val();
-                if (cellValue !== ""){
+                if (cellValue !== "") {
                     $(`#${row}_${inp}`).val(Number(cellValue * scaleFactor).toFixed(2));
                 }
-                
+
             }
         }
 
         //if row is Reference, then all the table needs to be recalcd, except Reference row
-        console.log("----------------------\n", row, R, row === R);
 
         if (row === R) {
             let allResponses = $(".response");
@@ -194,18 +202,15 @@ var APP = {
                 if (response.id === id) continue; //this was entered
                 let rowIdentifier = response.id.substring(0, response.id.indexOf("_"));
                 if (rowIdentifier === R) continue; //skip Reference row
-                let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
-                console.log("... recalc:", response.id);
-                let targetScaleFactor = parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
-                console.log('....targetScaleFactor', targetScaleFactor);
-                let value = parseFloat($(`#${response.id}`).val());
+                //let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
+                let targetScaleFactor = Number.parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
+                let value = Number.parseFloat($(`#${response.id}`).val());
                 value *= targetScaleFactor;
                 if (Number.isNaN(value)) {
                     value = "";
                 } else {
                     value = Number(value).toFixed(2);
                 }
-                console.log("....value", value, "id", rowIdentifier + "_" + columnIdentifier);
                 $(`#${response.id}`).val(value);
             }
         }
@@ -213,7 +218,7 @@ var APP = {
         //mass sum
         let massSum = 0;
         for (let component = 1; component <= Object.keys(COMPONENTS).length; component++) {
-            massSum += parseFloat($(`#Component${component}_mass`).val()) || 0;
+            massSum += Number.parseFloat($(`#Component${component}_mass`).val()) || 0;
         }
         massSum = massSum.toFixed(2);
         $(`#S_mass`).html(massSum);
@@ -224,39 +229,43 @@ var APP = {
         APP.storeReferences(R, referenceBy);
     },
     handleReferenceRowChange() {
-        console.clear();
         let R = APP.getReferenceRow();
         let referenceBy = $('input[name=whichref]:checked').val();
-        console.log(".R", R);
         APP.storeReferences(R, referenceBy);
+    },
+    handleReferenceTypeChange() {
+        let allResponses = $(".response");
+        for (let response of allResponses) {
+            $(`#${response.id}`).val("");
+        }
+        APP.init();
     },
     packArguments(row, R, referenceBy) {
         let arg = {};
         //inputs
         for (let inp of inputs) {
             let id = `${row}_${inp}`;
-            arg[inp] = parseFloat($(`#${id}`).val());
+            arg[inp] = Number.parseFloat($(`#${id}`).val());
         }
         //properties
         for (let prop of properties) {
             let id = `${row}_${prop}`;
-            arg[prop] = parseFloat($(`#${id}`).html());
+            arg[prop] = Number.parseFloat($(`#${id}`).html());
         }
         arg.assay = arg.assay || 1;
-        console.log(">>>", `#${R}_${referenceBy}`, `#${row}_${referenceBy}`);
-        arg.referenceFactor = parseFloat($(`#${R}_${referenceBy}`).val());
-        arg.selectedFactor = parseFloat($(`#${row}_${referenceBy}`).val());
+        arg.referenceFactor = Number.parseFloat($(`#${R}_${referenceBy}`).val());
+        arg.selectedFactor = Number.parseFloat($(`#${row}_${referenceBy}`).val());
+        arg.referenceBy = referenceBy;
         return arg;
     },
     storeReferences(R, referenceBy) {
         // store target for reference
-        APP.STACK.TARGET = parseFloat($(`#${R}_${referenceBy}`).val());
-        APP.STACK.REFERENCE_FACTOR = parseFloat($(`#${R}_factor`).val());
-        console.log('APP.STACK.TARGET', APP.STACK.TARGET);
-        console.log('APP.STACK.REFERENCE_FACTOR', APP.STACK.REFERENCE_FACTOR);
-    }
+        APP.STACK.TARGET = Number.parseFloat($(`#${R}_${referenceBy}`).val());
+        APP.STACK.REFERENCE_FACTOR = Number.parseFloat($(`#${R}_factor`).val());
+    },
 };
 
 APP.TABLE.draw();
 $('input[type=radio][name=reference]').change(APP.handleReferenceRowChange);
+$('input[type=radio][name=whichref]').change(APP.handleReferenceTypeChange);
 $(".response").change(APP.handle);
