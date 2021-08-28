@@ -56,7 +56,7 @@ var CALC = {
     }
 };
 var APP = {
-    version: "0.7.0",
+    version: "1.0.0",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -136,9 +136,10 @@ var APP = {
         // first checked by default
         $("#Ref_Component1").prop("checked", true);
         // first factor 1 by default if mol, otherwise """
+        $("#Component1_factor").val(1);
         if ($('input[name=whichref]:checked').val() === 'mass') {
             $("#Component1_factor").val("");
-        } else $("#Component1_factor").val(1);
+        }
     },
     getReferenceRow() {
         let R = $('input[name=reference]:checked').val();
@@ -202,7 +203,6 @@ var APP = {
                 if (response.id === id) continue; //this was entered
                 let rowIdentifier = response.id.substring(0, response.id.indexOf("_"));
                 if (rowIdentifier === R) continue; //skip Reference row
-                //let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
                 let targetScaleFactor = Number.parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
                 let value = Number.parseFloat($(`#${response.id}`).val());
                 value *= targetScaleFactor;
