@@ -14,7 +14,8 @@ console.clear();
  */
 
 var descriptors = ['Component', 'Ref'];
-var inputs = ['factor', 'mol', 'mass', 'volume'];
+//var inputs = ['factor', 'mol', 'mass', 'volume'];
+var inputs = ['mol', 'mass', 'volume', 'factor'];
 var properties = ['MW', 'density', 'assay'];
 var headers = [...descriptors, ...inputs, ...properties];
 
@@ -56,7 +57,7 @@ var CALC = {
     }
 };
 var APP = {
-    version: "1.0.0",
+    version: "1.0.1",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -104,7 +105,10 @@ var APP = {
             }
             html += `<td colspan=${properties.length}></td></tr>`;
             $("#table > tbody").append(html);
-            $("#table > tbody").append(`<tr class="table-dark"><td colspan=${headers.length}>Products</td></tr>`);
+            $("#table > tbody").append(`<tr class="table-dark">
+            <td colspan=${headers.length}>Products</td>
+            <td>Yield<td>
+            </tr>`);
             //products
             for (let comp in PRODUCTS) {
                 let html = '<tr>';
@@ -121,6 +125,10 @@ var APP = {
                     let propertyValue = PRODUCTS[comp][prop] || "";
                     html += `<td id = "Product${comp}_${prop}">${propertyValue}</td>`;
                 }
+
+                //yield
+                html += `<td><input class="yield" type="text" id = "Yield"></td>`;
+                //
 
                 html += "</tr>";
                 //insert row
@@ -147,13 +155,15 @@ var APP = {
         return R;
     },
     handle() {
+        console.clear();
+        console.log("--");
         let id = this.id;
         let row = id.substring(0, id.indexOf("_"));
         let column = id.substring(id.indexOf("_") + 1);
         let referenceBy = $('input[name=whichref]:checked').val();
         let R = APP.getReferenceRow();
 
-        //if column == factor in refby has no value
+        //if column == factor and refby has no value
         if (column === 'factor' && $(`#${row}_${referenceBy}`).val() === "") {
             if ($(`#${R}_${referenceBy}`).val() !== "") {
                 let refValue = $(`#${R}_${referenceBy}`).val() * $(`#${row}_factor`).val() / $(`#${R}_factor`).val();
@@ -168,6 +178,7 @@ var APP = {
             if (response.id === id) continue; //this was entered
             let responseColumn = response.id.substring(id.indexOf("_") + 1);
             let ARG = APP.packArguments(row, R, referenceBy);
+            console.log('response.id', response.id, "->", CALC[responseColumn](ARG));
             $(`#${response.id}`).val(CALC[responseColumn](ARG));
         }
 
@@ -182,12 +193,15 @@ var APP = {
             oldFactor = APP.STACK.REFERENCE_FACTOR;
         }
         let scaleFactor = Number.parseFloat($(`#${row}_factor`).val()) / oldFactor;
+        console.log('oldFactor', oldFactor);
+        console.log('scaleFactor', scaleFactor);
 
         //scale the row
         if (!Number.isNaN(scaleFactor)) {
             for (let inp of inputs) {
                 if (inp === 'factor') continue;
                 let cellValue = $(`#${row}_${inp}`).val();
+                console.log("..scaling row", inp, "->", cellValue, "SCALE->", Number(cellValue * scaleFactor).toFixed(2));
                 if (cellValue !== "") {
                     $(`#${row}_${inp}`).val(Number(cellValue * scaleFactor).toFixed(2));
                 }
@@ -198,6 +212,7 @@ var APP = {
         //if row is Reference, then all the table needs to be recalcd, except Reference row
 
         if (row === R) {
+            console.log("#### RECALC TABLE ####");
             let allResponses = $(".response");
             for (let response of allResponses) {
                 if (response.id === id) continue; //this was entered
