@@ -14,7 +14,6 @@ console.clear();
  */
 
 var descriptors = ['Component', 'Ref'];
-//var inputs = ['factor', 'mol', 'mass', 'volume'];
 var inputs = ['mol', 'mass', 'volume', 'factor'];
 var properties = ['MW', 'density', 'assay'];
 var headers = [...descriptors, ...inputs, ...properties];
@@ -57,7 +56,7 @@ var CALC = {
     }
 };
 var APP = {
-    version: "1.0.1",
+    version: "1.0.2",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -107,7 +106,6 @@ var APP = {
             $("#table > tbody").append(html);
             $("#table > tbody").append(`<tr class="table-dark">
             <td colspan=${headers.length}>Products</td>
-            <td>Yield<td>
             </tr>`);
             //products
             for (let comp in PRODUCTS) {
@@ -127,7 +125,7 @@ var APP = {
                 }
 
                 //yield
-                html += `<td><input class="yield" type="text" id = "Yield"></td>`;
+                //html += `<td><input class="yield" type="text" id = "Yield"></td>`;
                 //
 
                 html += "</tr>";
@@ -218,9 +216,14 @@ var APP = {
                 if (response.id === id) continue; //this was entered
                 let rowIdentifier = response.id.substring(0, response.id.indexOf("_"));
                 if (rowIdentifier === R) continue; //skip Reference row
+                let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
+                if  (columnIdentifier === 'factor') continue; //DEBUG
                 let targetScaleFactor = Number.parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
+                console.log("..recalc table", response, rowIdentifier, columnIdentifier,'targetScaleFactor', targetScaleFactor);
                 let value = Number.parseFloat($(`#${response.id}`).val());
+                console.log('...', value, '->');
                 value *= targetScaleFactor;
+                console.log('....', value);
                 if (Number.isNaN(value)) {
                     value = "";
                 } else {
