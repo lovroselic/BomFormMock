@@ -8,6 +8,7 @@ console.clear();
         assumed  units
 
 */
+
 /**
  * TODO:
 
@@ -48,7 +49,7 @@ var CALC = {
         let value = Number.parseFloat(Number.parseFloat(arg.mass) / arg.MW); //coercing "" to NaN
         if (Number.isNaN(value)) {
             if (arg.mol) {
-                //mol has been set from factor, but mass == "";
+                //if mol has been set from factor, but mass == "";
                 return arg.mol;
             } else return "";
         }
@@ -56,7 +57,7 @@ var CALC = {
     }
 };
 var APP = {
-    version: "1.0.2",
+    version: "1.1",
     STACK: {
         TARGET: null,
         REFERENCE_FACTOR: 1
@@ -124,10 +125,6 @@ var APP = {
                     html += `<td id = "Product${comp}_${prop}">${propertyValue}</td>`;
                 }
 
-                //yield
-                //html += `<td><input class="yield" type="text" id = "Yield"></td>`;
-                //
-
                 html += "</tr>";
                 //insert row
                 $("#table > tbody").append(html);
@@ -153,8 +150,6 @@ var APP = {
         return R;
     },
     handle() {
-        console.clear();
-        console.log("--");
         let id = this.id;
         let row = id.substring(0, id.indexOf("_"));
         let column = id.substring(id.indexOf("_") + 1);
@@ -176,7 +171,6 @@ var APP = {
             if (response.id === id) continue; //this was entered
             let responseColumn = response.id.substring(id.indexOf("_") + 1);
             let ARG = APP.packArguments(row, R, referenceBy);
-            console.log('response.id', response.id, "->", CALC[responseColumn](ARG));
             $(`#${response.id}`).val(CALC[responseColumn](ARG));
         }
 
@@ -187,19 +181,16 @@ var APP = {
             //oldFactor isNaN only if it has never been set, so:
             if (Number.isNaN(oldFactor)) oldFactor = 1;
         } else {
-            // can't calculate old reference factor from changed data;
+            // because you can't calculate old reference factor from changed data;
             oldFactor = APP.STACK.REFERENCE_FACTOR;
         }
         let scaleFactor = Number.parseFloat($(`#${row}_factor`).val()) / oldFactor;
-        console.log('oldFactor', oldFactor);
-        console.log('scaleFactor', scaleFactor);
 
         //scale the row
         if (!Number.isNaN(scaleFactor)) {
             for (let inp of inputs) {
                 if (inp === 'factor') continue;
                 let cellValue = $(`#${row}_${inp}`).val();
-                console.log("..scaling row", inp, "->", cellValue, "SCALE->", Number(cellValue * scaleFactor).toFixed(2));
                 if (cellValue !== "") {
                     $(`#${row}_${inp}`).val(Number(cellValue * scaleFactor).toFixed(2));
                 }
@@ -208,22 +199,17 @@ var APP = {
         }
 
         //if row is Reference, then all the table needs to be recalcd, except Reference row
-
         if (row === R) {
-            console.log("#### RECALC TABLE ####");
             let allResponses = $(".response");
             for (let response of allResponses) {
                 if (response.id === id) continue; //this was entered
                 let rowIdentifier = response.id.substring(0, response.id.indexOf("_"));
                 if (rowIdentifier === R) continue; //skip Reference row
                 let columnIdentifier = response.id.substring(response.id.indexOf("_") + 1);
-                if  (columnIdentifier === 'factor') continue; //DEBUG
+                if  (columnIdentifier === 'factor') continue; //skip factor column
                 let targetScaleFactor = Number.parseFloat($(`#${R}_${referenceBy}`).val()) / APP.STACK.TARGET;
-                console.log("..recalc table", response, rowIdentifier, columnIdentifier,'targetScaleFactor', targetScaleFactor);
                 let value = Number.parseFloat($(`#${response.id}`).val());
-                console.log('...', value, '->');
                 value *= targetScaleFactor;
-                console.log('....', value);
                 if (Number.isNaN(value)) {
                     value = "";
                 } else {
